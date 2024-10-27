@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -17,30 +18,39 @@ import (
 
 const (
 	ipCameraURL      = "rtsp://karthik:karthik@192.168.31.224/stream1" // Replace with your IP camera URL
-	outputFile       = "output.mp4"
-	recordDuration   = 60                   // Recording duration in seconds
-	clientSecretFile = "client_secret.json" // OAuth credentials file
-	tokenFilePath    = "token.json"         // File to store OAuth token
+	outputFile       = "output.mp4"                                    // Temporary file for recording
+	recordDuration   = 60                                              // Recording duration in seconds
+	clientSecretFile = "client_secret.json"                            // OAuth credentials file
+	tokenFilePath    = "token.json"                                    // File to store OAuth token
+	uploadInterval   = 0 * time.Minute                                 // Interval to upload recordings
 )
 
 func main() {
-	// Step 1: Record stream for 1 minute using FFmpeg
-	fmt.Println("Recording IP camera stream...")
-	if err := recordIPCameraStream(); err != nil {
-		log.Fatalf("Failed to record IP camera stream: %v", err)
-	}
-	fmt.Println("Recording completed.")
+	for {
+		startTime := time.Now()
+		fmt.Println("Recording IP camera stream...")
+		if err := recordIPCameraStream(); err != nil {
+			log.Fatalf("Failed to record IP camera stream: %v", err)
+		}
+		fmt.Println("Recording completed.")
 
-	// Step 2: Upload video to YouTube
-	if err := uploadToYouTube(outputFile); err != nil {
-		log.Fatalf("Failed to upload video to YouTube: %v", err)
-	}
+		// Generate video title based on recording times
+		videoTitle := fmt.Sprintf("IP Camera Recording %s to %s", startTime.Format("2006-01-02 15:04:05"), startTime.Add(recordDuration*time.Second).Format("2006-01-02 15:04:05"))
 
-	// Clean up the local video file
-	if err := os.Remove(outputFile); err != nil {
-		log.Printf("Failed to delete local video file: %v", err)
-	} else {
-		fmt.Println("Local video file deleted.")
+		// Step 2: Upload video to YouTube
+		if err := uploadToYouTube(outputFile, videoTitle); err != nil {
+			log.Fatalf("Failed to upload video to YouTube: %v", err)
+		}
+
+		// Clean up the local video file after upload
+		if err := os.Remove(outputFile); err != nil {
+			log.Printf("Failed to delete local video file: %v", err)
+		} else {
+			fmt.Println("Local video file deleted.")
+		}
+
+		// Wait for the specified upload interval before the next recording
+		time.Sleep(uploadInterval)
 	}
 }
 
@@ -64,7 +74,7 @@ func recordIPCameraStream() error {
 }
 
 // uploadToYouTube uploads a video to YouTube using the YouTube Data API.
-func uploadToYouTube(filename string) error {
+func uploadToYouTube(filename, title string) error {
 	ctx := context.Background()
 
 	// Read OAuth credentials file
@@ -88,12 +98,12 @@ func uploadToYouTube(filename string) error {
 	// Prepare the YouTube video
 	video := &youtube.Video{
 		Snippet: &youtube.VideoSnippet{
-			Title:       "IP Camera Recording",
+			Title:       title,
 			Description: "Recorded from an IP camera",
 			Tags:        []string{"IP Camera", "Recording"},
 			CategoryId:  "22", // 22 = People & Blogs
 		},
-		Status: &youtube.VideoStatus{PrivacyStatus: "unlisted"},
+		Status: &youtube.VideoStatus{PrivacyStatus: "private"}, // Set video to private
 	}
 
 	// Open the video file
