@@ -63,9 +63,3 @@ Before running this application, ensure you have the following installed:
 - Ensure that FFmpeg is properly installed and accessible in your system's PATH.
 - The YouTube Data API has quota limits; make sure to monitor your usage.
 - Videos are uploaded in private mode; you can change this in the code if needed.
-
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-- Thanks to the developers of FFmpeg and the Go programming language for their contributions to the open-source community.
