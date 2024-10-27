@@ -20,8 +20,8 @@ Before running this application, ensure you have the following installed:
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/yourusername/ip-camera-uploader.git
-   cd ip-camera-uploader
+   git clone git@github.com:karthik-minnikanti/cc-stream.git
+   cd cc-stream
    ```
 
 2. **Install Dependencies**
