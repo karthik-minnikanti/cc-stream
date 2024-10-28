@@ -95,7 +95,3 @@ This application records a stream from an IP camera and uploads the recording to
 
 - **AWS S3 Upload Issues**:  
   Ensure that your AWS credentials are correctly set up and that the S3 bucket exists with appropriate permissions.
-
-## License
-
-This project is licensed under the MIT License.
