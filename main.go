@@ -14,6 +14,10 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/youtube/v3"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3"
 )
 
 const (
@@ -25,7 +29,33 @@ const (
 	uploadInterval   = 0 * time.Minute                                 // Interval to upload recordings
 )
 
+type Config struct {
+	UploadTo   string `json:"upload_to"`
+	BucketName string `json:"bucket_name"`
+}
+
+func loadConfig(filePath string) (*Config, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	config := &Config{}
+	err = json.NewDecoder(file).Decode(config)
+	if err != nil {
+		return nil, err
+	}
+	return config, nil
+}
+
 func main() {
+
+	config, err := loadConfig("config.json") // Path to your configuration file
+	if err != nil {
+		log.Fatalf("Failed to load config: %v", err)
+	}
+
 	for {
 		startTime := time.Now()
 		fmt.Println("Recording IP camera stream...")
@@ -38,8 +68,17 @@ func main() {
 		videoTitle := fmt.Sprintf("IP Camera Recording %s to %s", startTime.Format("2006-01-02 15:04:05"), startTime.Add(recordDuration*time.Second).Format("2006-01-02 15:04:05"))
 
 		// Step 2: Upload video to YouTube
-		if err := uploadToYouTube(outputFile, videoTitle); err != nil {
-			log.Fatalf("Failed to upload video to YouTube: %v", err)
+
+		switch config.UploadTo {
+		case "s3":
+			if err := uploadToS3(outputFile, *config); err != nil {
+				log.Fatalf("Failed to upload video to S3: %v", err)
+			}
+
+		case "youtube":
+			if err := uploadToYouTube(outputFile, videoTitle); err != nil {
+				log.Fatalf("Failed to upload video to YouTube: %v", err)
+			}
 		}
 
 		// Clean up the local video file after upload
@@ -172,4 +211,35 @@ func saveToken(path string, token *oauth2.Token) {
 	}
 	defer f.Close()
 	json.NewEncoder(f).Encode(token)
+}
+
+func uploadToS3(filename string, config Config) error {
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String("ap-south-1"), // Specify your region
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create session: %w", err)
+	}
+
+	svc := s3.New(sess)
+
+	file, err := os.Open(filename)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	bucket := config.BucketName // Replace with your S3 bucket name
+	_, err = svc.PutObject(&s3.PutObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(filename),
+		Body:   file,
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to upload to S3: %w", err)
+	}
+
+	fmt.Printf("File uploaded to S3: %s\n", filename)
+	return nil
 }
