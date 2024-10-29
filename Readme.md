@@ -1,97 +1,89 @@
-
 # IP Camera Stream Recorder and Uploader
 
 This application records a stream from an IP camera and uploads the recording to either YouTube or Amazon S3, based on the configuration specified in `config.json`.
 
 ## Features
 
-- **Record Video**: Records video from an IP camera stream using FFmpeg.
-- **Upload to YouTube or S3**: Uploads recorded videos to YouTube or S3 depending on configuration.
-- **Automatic Cleanup**: Deletes local video files after upload.
-- **Configurable Intervals**: Set upload intervals for continuous recording and uploading.
+- **Live Streaming**: Directly streams video from an IP camera using FFmpeg without recording
+- **Upload to S3**: Uploads to S3 depending on configuration
+- **Flexible Configuration**: Configurable streaming settings and destinations
+- **Real-time Processing**: Handles video feed in real-time without local storage
 
 ## Requirements
 
-- [Go](https://golang.org/doc/install)
-- [FFmpeg](https://ffmpeg.org/download.html) (must be installed and accessible from the command line)
-- **AWS and YouTube credentials**:
-  - AWS account with S3 permissions
+- [Docker](https://docs.docker.com/get-docker/)
+- For YouTube uploads:
   - Google Cloud project with YouTube Data API enabled
+  - OAuth 2.0 credentials (`client_secret.json`)
+- For S3 uploads:
+  - AWS account with S3 permissions
+  - AWS credentials configured
 
-## Installation
+## Installation & Setup
 
-1. **Clone the Repository**:
+1. Clone the repository:
    ```bash
-   git clone git@github.com:karthik-minnikanti/cc-stream.git
+   git clone https://github.com/karthik-minnikanti/cc-stream.git
    cd cc-stream
    ```
 
-2. **Install Dependencies**:
-   Use Go modules to install dependencies:
+2. Configure environment variables:
+   Create `.env` file in the project root:
+   ```
+   UPLOAD_TO=youtube          # "youtube" or "s3"
+   BUCKET_NAME=youtube        # S3 bucket name (for S3 uploads)
+   IP_CAMERA_URL=rtsp://user:pass@camera-ip/stream  # Your IP camera RTSP URL
+   OUTPUT_FILE=output.mp4     # Local recording filename
+   RECORD_DURATION=300        # Recording duration in seconds
+   CLIENT_SECRET_FILE=client_secret.json  # Google OAuth credentials file
+   TOKEN_FILE_PATH=token.json # YouTube auth token file
+   UPLOAD_INTERVAL=5          # Interval between uploads in minutes
+   ```
+
+3. Set up credentials:
+   - For YouTube: Place `client_secret.json` from Google Cloud Console in project root
+   - For S3: Configure AWS credentials via AWS CLI
+
+## Running with Docker
+
+1. Build the Docker image:
    ```bash
-   go mod tidy
+   docker build -t cc-stream .
    ```
 
-3. **Set up Google OAuth Credentials**:
-   - Download `client_secret.json` from your Google Cloud console (with YouTube Data API enabled) and place it in the root directory.
-
-4. **Set up AWS Credentials**:
-   - Configure your AWS credentials via the AWS CLI or by setting environment variables (`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`).
-
-5. **Configuration**:
-   Create a `config.json` file in the root directory to specify the upload destination and S3 bucket name:
-   ```json
-   {
-     "upload_to": "youtube", // Set to "youtube" or "s3"
-     "bucket_name": "your-s3-bucket-name" // S3 bucket name if upload_to is set to "s3"
-   }
-   ```
-
-## Usage
-
-1. **Run the Application**:
+2. Run the container:
    ```bash
-   go run main.go
+   docker run -v $(pwd)/config.json:/app/config.json \
+             -v $(pwd)/client_secret.json:/app/client_secret.json \
+             -v $(pwd)/token.json:/app/token.json \
+             cc-stream
    ```
 
-2. **Authenticate for YouTube Uploads**:
-   - The first time you run the program, it will prompt you to authenticate with your Google account. Follow the printed instructions and enter the authorization code to grant access for YouTube uploads.
+### First Time Setup for YouTube
 
-3. **Set IP Camera URL**:
-   - Modify the `ipCameraURL` constant in `main.go` to point to your IP camera's RTSP stream.
+When running for the first time with YouTube:
+1. The program will provide an authorization URL
+2. Open the URL in your browser
+3. Log in to your Google account and grant permissions
+4. Copy the authorization code shown
+5. Paste the code back into the container prompt
+6. The token will be saved to token.json for future use
 
-## Configuration Details
+### Regular Usage
 
-- **Upload Destination (`upload_to`)**:  
-  Determines where the video will be uploaded. Set to `"youtube"` for YouTube or `"s3"` for Amazon S3.
+After initial setup, the program will:
+- For S3 uploads:
+  - Record from IP camera
+  - Upload to S3
+  - Delete local file
+  - Wait for configured interval
+  - Repeat process
 
-- **Bucket Name (`bucket_name`)**:  
-  Required if `upload_to` is set to `"s3"`. Replace `"your-s3-bucket-name"` with the name of your S3 bucket.
+- For YouTube uploads:
+  - Create YouTube live stream
+  - Stream directly from camera to YouTube
 
-- **Recording Duration (`recordDuration`)**:  
-  Set the duration (in seconds) for each recording session.
+To stop the program:
+- Press Ctrl+C
 
-- **Upload Interval (`uploadInterval`)**:  
-  Specifies the interval between consecutive recordings and uploads. Set to `0` for continuous recording.
 
-## Code Structure
-
-- **`recordIPCameraStream`**  
-  Uses FFmpeg to record the IP camera stream for the specified duration and saves it as `output.mp4`.
-
-- **`uploadToYouTube`**  
-  Authenticates with the YouTube API using OAuth2 and uploads the video to YouTube.
-
-- **`uploadToS3`**  
-  Uploads the recorded video file to an Amazon S3 bucket.
-
-## Troubleshooting
-
-- **FFmpeg Errors**:  
-  Ensure FFmpeg is installed and accessible from the command line. Use `ffmpeg -version` to check the installation.
-
-- **Google OAuth Authentication**:  
-  If authentication fails, verify that `client_secret.json` is correctly downloaded from the Google Developer Console and placed in the project root.
-
-- **AWS S3 Upload Issues**:  
-  Ensure that your AWS credentials are correctly set up and that the S3 bucket exists with appropriate permissions.
