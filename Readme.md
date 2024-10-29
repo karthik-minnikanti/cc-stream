@@ -18,6 +18,7 @@ This application records a stream from an IP camera and uploads the recording to
 - For S3 uploads:
   - AWS account with S3 permissions
   - AWS credentials configured
+  
 
 ## Installation & Setup
 
